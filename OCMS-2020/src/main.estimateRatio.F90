@@ -1,0 +1,52 @@
+! Copyright(C) 2019,2020 Telecognix Corporation. All rights reserved.
+! See OCMS-License-OCMS-2020-Basic.txt/OCMS-License-OCMS-2020-Extension-Tools.txt in OCMS top directory.
+! Contact ocms@telecognix.com for further information.
+
+program estimateRatio
+  implicit none
+  integer :: nbe,n,iargc,count
+  character :: arg*10
+  real(8), parameter :: pi = 4d0*datan(1d0)
+  real(8) :: ds_max,nin,k,lambda,ratio
+  real(8), allocatable :: ds(:),kappa(:),xl(:),yl(:),nx(:),ny(:)
+
+  count=iargc()
+  if( count == 3 ) then
+     call getarg(1,arg)
+     read(arg,*) nin
+     call getarg(2,arg)
+     read(arg,*) k
+     call getarg(3,arg)
+     read(arg,*) nbe
+  else
+     write(*,*) "Error: insufficient or too many command-line arguments."
+     write(*,*)
+     write(*,*) "Usage: estimateRatio [nin] [k] [NBE]"
+     write(*,*)
+     write(*,*) "nin : Refractive index inside the cavity."
+     write(*,*) "k   : Wave number (in the vacuum)."
+     write(*,*) "NBE : The number of boundary elements."
+     stop
+  end if
+
+  allocate(ds(nbe),kappa(nbe),xl(nbe),yl(nbe),nx(nbe),ny(nbe))
+
+  call def_bndry(nbe,ds,kappa,xl,yl,nx,ny)
+
+  ! Determine ds_max (=the maximum length of the boundary elements)
+  ds_max=0d0
+  do n=1,nbe
+     if (ds(n)>ds_max) then
+        ds_max=ds(n)
+     end if
+  end do
+
+  lambda=dsqrt(4d0*pi*pi/(2d0*k+1d0))
+  ratio=0.5d0*lambda/ds_max ! ratio = half-wavelength / ds_max
+  
+  print '(" --> 0.5*lambda/ds_max = ",f0.2)', ratio
+
+  deallocate(ds,kappa,xl,yl,nx,ny)
+
+  stop
+end program estimateRatio

@@ -1,0 +1,91 @@
+! Copyright(C) 2019,2020 Telecognix Corporation. All rights reserved.
+! See OCMS-License-OCMS-2020-Basic.txt/OCMS-License-OCMS-2020-Extension-Tools.txt in OCMS top directory.
+! Contact ocms@telecognix.com for further information.
+
+program estimateNBE
+  implicit none
+  integer :: nbe,n,iargc,count
+  character :: arg*10
+  real(8), parameter :: pi = 4d0*datan(1d0)
+  real(8) :: nin,k,target_ratio,ratio_100,ratio_nbe
+
+  count=iargc()
+  if( count == 3 ) then
+     call getarg(1,arg)
+     read(arg,*) nin
+     call getarg(2,arg)
+     read(arg,*) k
+     call getarg(3,arg)
+     read(arg,*) target_ratio
+  else
+     write(*,*) "Error: insufficient or too many command-line arguments."
+     write(*,*)
+     write(*,*) "Usage: estimateNBE [nin] [k] [ratio]"
+     write(*,*)
+     write(*,*) "nin : Refractive index inside the cavity."
+     write(*,*) "k   : Wave number (in the vacuum)."
+     write(*,*) "ratio :=  (lambda_in/ds_max)/2,"
+     write(*,*) "          where lambda_in is the wave length inside the cavity,"
+     write(*,*) "          and ds_max is the maximum length of the boundary element."
+     stop
+  end if
+
+  ratio_100=calc_ratio(nin,k,100)
+  nbe=int(100*(target_ratio/ratio_100))+1
+
+  ratio_nbe=calc_ratio(nin,k,nbe)
+
+  if (ratio_nbe > target_ratio) then
+     do while(ratio_nbe > target_ratio)
+        nbe=nbe-1
+        ratio_nbe=calc_ratio(nin,k,nbe)
+        !write(*,*) nbe,target_ratio,ratio_nbe
+     enddo
+     nbe=nbe+1
+     ratio_nbe=calc_ratio(nin,k,nbe)
+     !write(*,*) nbe,target_ratio,ratio_nbe
+  else if (ratio_nbe < target_ratio) then
+     do while(ratio_nbe < target_ratio)
+        nbe=nbe+1
+        ratio_nbe=calc_ratio(nin,k,nbe)
+        !write(*,*) nbe,target_ratio,ratio_nbe
+     enddo
+     !nbe=nbe-1
+     ratio_nbe=calc_ratio(nin,k,nbe)
+     !write(*,*) nbe,target_ratio,ratio_nbe
+  endif
+
+  print '("NBE="i0" --> ratio="f0.6)',nbe,ratio_nbe
+
+  stop
+contains
+
+  function calc_ratio(nin,k,nbe) result(ratio)
+    implicit none
+    integer nbe
+    real(8) :: nin,k,lambda,ds_max,ratio
+    real(8), parameter :: pi = 4d0*datan(1d0)
+    real(8), allocatable :: ds(:),kappa(:),xl(:),yl(:),nx(:),ny(:)
+    
+    allocate(ds(nbe),kappa(nbe),xl(nbe),yl(nbe),nx(nbe),ny(nbe))
+    call def_bndry(nbe,ds,kappa,xl,yl,nx,ny)
+    
+    ! Determine ds_max (=the maximum length of the boundary elements)
+    ds_max=0d0
+    do n=1,nbe
+       if (ds(n)>ds_max) then
+          ds_max=ds(n)
+       end if
+    end do
+
+    lambda=2d0*pi/(nin*k)               !MB
+    !lambda=dsqrt(4d0*pi*pi/(2d0*k+1d0)) !SB  Confirm this is correct.
+    
+    ratio=0.5d0*lambda/ds_max ! ratio = half-wavelength / ds_max
+    
+    deallocate(ds,kappa,xl,yl,nx,ny)
+    
+    return
+  end function calc_ratio
+  
+end program estimateNBE
